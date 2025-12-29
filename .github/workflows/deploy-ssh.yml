@@ -21,6 +21,7 @@ jobs:
             git pull origin main
             docker compose down || true
             docker compose up -d --build
+            docker compose ps
 
             # quick check
             sleep 5
