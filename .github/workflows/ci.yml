@@ -16,7 +16,7 @@ jobs:
       - name: Build and start stack
         run: |
           docker compose up -d --build
-          sleep 100
+          sleep 10
 
       - name: Smoke test
         run: |
