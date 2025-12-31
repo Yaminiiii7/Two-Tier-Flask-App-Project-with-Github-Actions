@@ -45,7 +45,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-
+        
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 10s
