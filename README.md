@@ -23,7 +23,7 @@
 ---
 
 ### **1. Project Overview**
-This document outlines the step-by-step process for deploying a 2-tier web application (Flask + MySQL) on an AWS EC2 instance. The deployment is containerized using Docker and Docker Compose. A full CI/CD pipeline is established using Jenkins to automate the build and deployment process whenever new code is pushed to a GitHub repository.
+This document outlines the step-by-step process for deploying a two-tier web application (Flask and MySQL) on an AWS EC2 instance. The application is containerized using Docker and orchestrated with Docker Compose. A complete CI/CD pipeline is implemented using GitHub Actions, which automatically builds and deploys the application by securely connecting to the EC2 instance via SSH whenever new code is pushed to the GitHub repository.
 
 ---
 
@@ -31,8 +31,8 @@ This document outlines the step-by-step process for deploying a 2-tier web appli
 
 ```
 +-----------------+      +----------------------+      +-----------------------------+
-|   Developer     |----->|     GitHub Repo      |----->|        Jenkins Server       |
-| (pushes code)   |      | (Source Code Mgmt)   |      |  (on AWS EC2)               |
+|   Developer     |----->|     GitHub Repo      |----->|       Github Workflow       |
+| (pushes code)   |      | (Source Code Mgmt)   |      |         (SSH to EC2)        |
 +-----------------+      +----------------------+      |                             |
                                                        | 1. Clones Repo              |
                                                        | 2. Builds Docker Image      |
@@ -60,101 +60,112 @@ This document outlines the step-by-step process for deploying a 2-tier web appli
 
 ### **3. Step 1: AWS EC2 Instance Preparation**
 
-1.  **Launch EC2 Instance:**
-    * Navigate to the AWS EC2 console.
-    * Launch a new instance using the **Ubuntu 22.04 LTS** AMI.
-    * Select the **t2.micro**/**c7i-flex.large** instance type for free-tier eligibility.
-    * Create and assign a new key pair for SSH access.
+1.  **Create User**
+    * In the AWS console, Identity and Access Management --> Users --> Create User
+    * Type terraform-User --> next.
+    * Click on *Attach Policies directly*. Set permissions to *AmazonEC2FullAccess* and then create user.
 
-<img src="diagrams/instance.png">
+    <img src="diagrams/permissions_user.png">
 
+    * Go to security credentials tab of user to create access key
+    * Click on create access key and select Command Line Interface (CLI) option and create.
+    * Open CLI, type **aws configure** and get credentials from AWS console.
 
-2.  **Configure Security Group:**
-    * Create a security group with the following inbound rules:
-        * **Type:** SSH, **Protocol:** TCP, **Port:** 22, **Source:** Your IP or 0.0.0.0/0 
-        * **Type:** HTTP, **Protocol:** TCP, **Port:** 80, **Source:** Anywhere (0.0.0.0/0)
-        * **Type:** Custom TCP, **Protocol:** TCP, **Port:** 5000 (for Flask), **Source:** Anywhere (0.0.0.0/0)
-        * **Type:** Custom TCP, **Protocol:** TCP, **Port:** 8080 (for Jenkins), **Source:** Anywhere (0.0.0.0/0)
+    ```
+        AWS Access Key ID:     <paste access key>
+        AWS Secret Access Key: <paste secret key>
+        Default region name:   us-west-2
+        Default output format: json
 
-<img src="diagrams/securityGroup.png">
+    ```
+    <img src="diagrams/awsconfigure.png"> 
 
-3.  **Connect to EC2 Instance:**
-    * Use SSH to connect to the instance's public IP address.
-    ```bash
-    ssh -i /path/to/key.pem ubuntu@<ec2-public-ip>
+2.  Create .pem file in AWS console as shown.
+
+    <img src="diagrams/EC2_Keypair.png">
+
+3.  Install Terraform through winget
+
+    ```
+        winget install HashiCorp.Terraform
+        terraform -version
+
+    ```
+    Winget will download Terraform, installs it, add it to your PATH automatically.
+
+4.  Create main.tf file and add the following.
+
+    ```
+    provider "aws" {
+        region = "us-west-2"
+    }
+
+    resource "aws_security_group" "ec2_sg" {
+        name        = "ec2-sg"
+        description = "Security group for Flask and SSH"
+
+        ingress {
+            description = "SSH"
+            from_port   = 22
+            to_port     = 22
+            protocol    = "tcp"
+            cidr_blocks = ["0.0.0.0/0"] #or replace with your device IP address
+        }
+
+        ingress {
+            description = "HTTP"
+            from_port   = 80
+            to_port     = 80
+            protocol    = "tcp"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+
+        ingress {
+            description = "Flask App"
+            from_port   = 5000
+            to_port     = 5000
+            protocol    = "tcp"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+
+        egress {
+            from_port   = 0
+            to_port     = 0
+            protocol    = "-1"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+
+        tags = {
+            Name = "EC2-SG"
+        }
+    }
+
+    resource "aws_instance" "ec2" {
+        ami                    = "ami-00f46ccd1cbfb363e" # ubuntu server (Oregon)
+        instance_type          = "t2.micro"
+        key_name               = "EC2_Keypair"         # .pem extension will be added auto
+        vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+
+        tags = {
+            Name = "Flask-EC2"
+        }
+    }
+
+    ```
+5.  Create EC2 with following commands in the CLI.
+
+    ```
+        terraform init
+        terraform plan
+        terraform apply
+
     ```
 
----
 
-### **4. Step 2: Install Dependencies on EC2**
-
-1.  **Update System Packages:**
-    ```bash
-    sudo apt update && sudo apt upgrade -y
-    ```
-
-2.  **Install Git, Docker, and Docker Compose:**
-    ```bash
-    sudo apt install git docker.io docker-compose-v2 -y
-    ```
-
-3.  **Start and Enable Docker:**
-    ```bash
-    sudo systemctl start docker
-    sudo systemctl enable docker
-    ```
-
-4.  **Add User to Docker Group (to run docker without sudo):**
-    ```bash
-    sudo usermod -aG docker $USER
-    newgrp docker
-    ```
-
----
-
-### **5. Step 3: Jenkins Installation and Setup**
-
-1.  **Install Java (OpenJDK 17):**
-    ```bash
-    sudo apt install openjdk-17-jdk -y
-    ```
-
-2.  **Add Jenkins Repository and Install:**
-    ```bash
-    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc >/dev/null
-
-    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list >/dev/null
-    
-    sudo apt update
-    sudo apt install jenkins -y
-    ```
-
-3.  **Start and Enable Jenkins Service:**
-    ```bash
-    sudo systemctl start jenkins
-    sudo systemctl enable jenkins
-    ```
-
-4.  **Initial Jenkins Setup:**
-    * Retrieve the initial admin password:
-        ```bash
-        sudo cat /var/lib/jenkins/secrets/initialAdminPassword
-        ```
-    * Access the Jenkins dashboard at `http://<ec2-public-ip>:8080`.
-    * Paste the password, install suggested plugins, and create an admin user.
-
-5.  **Grant Jenkins Docker Permissions:**
-    ```bash
-    sudo usermod -aG docker jenkins
-    sudo systemctl restart jenkins
-    ```
-
-
----
 
 ### **6. Step 4: GitHub Repository Configuration**
 
-Ensure your GitHub repository contains the following three files.
+Ensure your GitHub repository contains the following files.
 
 #### **Dockerfile**
 This file defines the environment for the Flask application container.
@@ -240,126 +251,106 @@ volumes:
 networks:
   two-tier:
 ```
+### **8. Github configuration**
 
-#### **Jenkinsfile**
-This file contains the pipeline-as-code definition for Jenkins.
-```groovy
-pipeline {
-    agent any
-    stages {
-        stage('Clone Code') {
-            steps {
-                // Replace with your GitHub repository URL
-                git branch: 'main', url: 'https://github.com/Yaminiiii7/Two-Tier-Flask-App-Project.git'
-            }
-        }
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t flask-app:latest .'
-            }
-        }
-        stage('Deploy with Docker Compose') {
-            steps {
-                // Stop existing containers if they are running
-                sh 'docker compose down || true'
-                // Start the application, rebuilding the flask image
-                sh 'docker compose up -d --build'
-            }
-        }
-    }
-}
+*   Go to Settings of your GitHub repository
+*   Select Secrets and variables
+*   Click Actions
+*   Click New repository secret
+
 ```
+    Secret Name	  Description
+    EC2_HOST	  Public IPv4 address or public DNS of the EC2 instance
+    EC2_USER	  SSH username (e.g. ubuntu)
+    EC2_SSH_KEY	  SSH key (.pem) used to connect to EC2
+```
+
+*  Create the folder .github/workflows in repository root folder
+*  Create a file named deploy-ssh.yml and the following code to it.
+
+```yaml
+name: Deploy (SSH -> EC2)
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/${{ secrets.EC2_USER }}/Two-Tier-Flask-App-Project/Two-Tier-Flask-App-Project-with-Github-Actions
+
+            git pull origin main
+            docker compose down || true
+            docker compose up -d --build
+            docker compose ps
+
+            # quick check
+            sleep 5
+            curl -f http://localhost:5000/health || curl -f http://localhost:5000/
+
+```
+
+
+6.  **Connect to EC2 Instance:**
+    * Use SSH to connect to the instance's public IP address.
+    ```bash
+    ssh -i /path/to/key.pem ubuntu@<ec2-public-ip>
+    ```
 
 ---
 
-### **7. Step 5: Jenkins Pipeline Creation and Execution**
+7. **Install Dependencies on EC2**
 
-1.  **Create a New Pipeline Job in Jenkins:**
-    * From the Jenkins dashboard, select **New Item**.
-    * Name the project, choose **Pipeline**, and click **OK**.
-<img src="diagrams/newitem.png">
-
-2.  **Configure the Pipeline:**
-    * In the project configuration, scroll to the **Pipeline** section.
-    * Set **Definition** to **Pipeline script from SCM**.
-    * Choose **Git** as the SCM.
-    * Enter your GitHub repository URL.
-    * Verify the **Script Path** is `Jenkinsfile`.
-    * Save the configuration.
-
-<img src="diagrams/configure-pipeline.png">
-
-3.  **Run the Pipeline:**
-    * Click **Build Now** to trigger the pipeline manually for the first time.
-    * Monitor the execution through the **Stage View** or **Console Output**.
-
-<img src="diagrams/sucess_console.png">
-
-4.  **Verify Deployment:**
-    * After a successful build, your Flask application will be accessible at `http://<your-ec2-public-ip>:5000`.
-    * Confirm the containers are running on the EC2 instance with `docker ps`.
-
-<img src="diagrams/display.png">
-
-5. **Test the volumes persistance(optional)**
-    * Enter any text as shown 
-      
-    <img src="diagrams/enterdata.png">
-
-    * Stop the container
-    ```
-        docker stop mysql
-        docker ps -a
-   
-    ```
-    <img src="diagrams/dockerstop.png">
-
-    * Refresh the browser
-    
-    * Restart the mysql container and Look at the text in the application still exists.(Volume persistence)
-
-6. **Check the stored SQL data(optional)**
-    ```
-        docker exec -it mysql bash
-        mysql -u root -proot
-        show databases;
-        use devops;
-        select * from messages;
-        exit
-  
+1.  **Update System Packages:**
+    ```bash
+    sudo apt update && sudo apt upgrade -y
     ```
 
-    <img src="diagrams/checkSQLdata.png">
-
-7. **Inspect the volume (optional)**
-
-    ```
-        docker volume ls
-        docker inspect <volumename>
-        sudo su
-        cd /var/lib/docker/volumes/<volumename>/_data
-        (or)
-        cd <mountpath>
-        ls
-
+2.  **Install Git, Docker, and Docker Compose:**
+    ```bash
+    sudo apt install git docker.io docker-compose-v2 -y
     ```
 
-    <img src="diagrams/inspectVolume.png">
+3.  **Start and Enable Docker:**
+    ```bash
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    ```
 
-8. **Troubleshooting**
-    * Incase Jenkins server is taking longer time to run the job(>3 minutes for this project), check the monitoring tab for CPU and memory utilisation.If exceeds > 60%, its time to change the instance type to larger one.(In my case I switched from t3.micro to c7i-flex.large)
+4.  **Add User to Docker Group (to run docker without sudo):**
+    ```bash
+    sudo usermod -aG docker $USER
+    newgrp docker
+    ```
 
-    <img src="diagrams/monitoring.png">
+---
+
+5.  Clone the repository to EC2.  
+    mkdir -p ~/Two-Tier-Flask-App-Project
+    cd ~/Two-Tier-Flask-App-Project
+    git clone https://github.com/Yaminiiii7/Two-Tier-Flask-App-Project-with-Github-Actions.git .
+
 
 ---
 
 ### **8. Conclusion**
-The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the Jenkins pipeline, which will build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
+The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the GitHub actions, which will SSH into EC2, build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
 
 
 ### **9. Infrastructure Diagram**
-<img src="diagrams/Infrastructure.png">
+<img src="diagrams/infra.png">
 
 
 ### **10. Work flow Diagram**
-<img src="diagrams/project_workflow.png">
+<img src="diagrams/workflow.PNG">
