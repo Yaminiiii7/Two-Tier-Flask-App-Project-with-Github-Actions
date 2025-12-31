@@ -1,7 +1,7 @@
-# DevOps Project Report: Automated CI/CD Pipeline for a 2-Tier Flask Application on AWS
+#  Automated CI/CD Pipeline for a 2-Tier Flask Application on AWS with Github actions workflow
 
 **Author:** Yamini Mandadi
-**Date:** December 27, 2025
+**Date:** December 30, 2025
 
 ---
 
@@ -9,16 +9,14 @@
 1. [Project Overview](#1-project-overview)
 2. [Architecture Diagram](#2-architecture-diagram)
 3. [Step 1: AWS EC2 Instance Preparation](#3-step-1-aws-ec2-instance-preparation)
-4. [Step 2: Install Dependencies on EC2](#4-step-2-install-dependencies-on-ec2)
-5. [Step 3: Jenkins Installation and Setup](#5-step-3-jenkins-installation-and-setup)
-6. [Step 4: GitHub Repository Configuration](#6-step-4-github-repository-configuration)
+4. [Step 2: GitHub Repository Configuration](#4-step-2-github-repository-configuration)
+5. [Step 3: Install Dependencies on EC2](#5-step-3-install-dependencies-on-ec2)
+
     * [Dockerfile](#dockerfile)
     * [docker-compose.yml](#docker-composeyml)
-    * [Jenkinsfile](#jenkinsfile)
-7. [Step 5: Jenkins Pipeline Creation and Execution](#7-step-5-jenkins-pipeline-creation-and-execution)
-8. [Conclusion](#8-conclusion)
-9. [Infrastructure Diagram](#9-infrastructure-diagram)
-10. [Work flow Diagram](#10-work-flow-diagram)
+6. [Conclusion](#8-conclusion)
+7. [Infrastructure Diagram](#9-infrastructure-diagram)
+8. [Work flow Diagram](#10-work-flow-diagram)
 
 ---
 
@@ -63,9 +61,11 @@ This document outlines the step-by-step process for deploying a two-tier web app
 1.  **Create User**
     * In the AWS console, Identity and Access Management --> Users --> Create User
     * Type terraform-User --> next.
-    * Click on *Attach Policies directly*. Set permissions to *AmazonEC2FullAccess* and then create user.
+    * Click on **Attach Policies directly**. Set permissions to **AmazonEC2FullAccess** and then create user.
+
 
     <img src="diagrams/permissions_user.png">
+
 
     * Go to security credentials tab of user to create access key
     * Click on create access key and select Command Line Interface (CLI) option and create.
@@ -163,11 +163,11 @@ This document outlines the step-by-step process for deploying a two-tier web app
 
 
 
-### **6. Step 4: GitHub Repository Configuration**
+### **4. Step 2: GitHub Repository Configuration**
 
 Ensure your GitHub repository contains the following files.
 
-#### **Dockerfile**
+ #### **Dockerfile**
 This file defines the environment for the Flask application container.
 ```dockerfile
 # Use an official Python runtime as a parent image
@@ -196,7 +196,7 @@ EXPOSE 5000
 CMD ["python", "app.py"]
 ```
 
-#### **docker-compose.yml**
+ #### **docker-compose.yml**
 This file defines and orchestrates the multi-container application (Flask and MySQL).
 ```yaml
 version: "3.8"
@@ -251,7 +251,7 @@ volumes:
 networks:
   two-tier:
 ```
-### **8. Github configuration**
+  #### **Github Secrets configuration**
 
 *   Go to Settings of your GitHub repository
 *   Select Secrets and variables
@@ -264,7 +264,7 @@ networks:
     EC2_USER	  SSH username (e.g. ubuntu)
     EC2_SSH_KEY	  SSH key (.pem) used to connect to EC2
 ```
-
+ #### **Github workflow configuration**
 *  Create the folder .github/workflows in repository root folder
 *  Create a file named deploy-ssh.yml and the following code to it.
 
@@ -302,7 +302,9 @@ jobs:
 ```
 
 
-6.  **Connect to EC2 Instance:**
+
+### **5. Step 3: Install Dependencies on EC2**
+## ** Connect to EC2 Instance**
     * Use SSH to connect to the instance's public IP address.
     ```bash
     ssh -i /path/to/key.pem ubuntu@<ec2-public-ip>
@@ -310,25 +312,24 @@ jobs:
 
 ---
 
-7. **Install Dependencies on EC2**
 
-1.  **Update System Packages:**
+  **Update System Packages:**
     ```bash
     sudo apt update && sudo apt upgrade -y
     ```
 
-2.  **Install Git, Docker, and Docker Compose:**
+  **Install Git, Docker, and Docker Compose:**
     ```bash
     sudo apt install git docker.io docker-compose-v2 -y
     ```
 
-3.  **Start and Enable Docker:**
+  **Start and Enable Docker:**
     ```bash
     sudo systemctl start docker
     sudo systemctl enable docker
     ```
 
-4.  **Add User to Docker Group (to run docker without sudo):**
+  **Add User to Docker Group (to run docker without sudo):**
     ```bash
     sudo usermod -aG docker $USER
     newgrp docker
@@ -336,21 +337,24 @@ jobs:
 
 ---
 
-5.  Clone the repository to EC2.  
+  **Clone the repository to EC2** 
+
+    ```bash
     mkdir -p ~/Two-Tier-Flask-App-Project
     cd ~/Two-Tier-Flask-App-Project
     git clone https://github.com/Yaminiiii7/Two-Tier-Flask-App-Project-with-Github-Actions.git .
 
+    ```
 
 ---
 
-### **8. Conclusion**
-The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the GitHub actions, which will SSH into EC2, build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
+### **6. Conclusion**
+The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the GitHub actions workflow, which will SSH into EC2, build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
 
 
-### **9. Infrastructure Diagram**
+### **7. Infrastructure Diagram**
 <img src="diagrams/infra.png">
 
 
-### **10. Work flow Diagram**
+### **8. Work flow Diagram**
 <img src="diagrams/workflow.PNG">
