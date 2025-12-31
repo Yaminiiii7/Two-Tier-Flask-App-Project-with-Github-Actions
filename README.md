@@ -304,37 +304,37 @@ jobs:
 
 
 ### **5. Step 3: Install Dependencies on EC2**
- **Connect to EC2 Instance**
+ #### **Connect to EC2 Instance**
     * Use SSH to connect to the instance's public IP address.
     ```bash
     ssh -i /path/to/key.pem ubuntu@<ec2-public-ip>
     ```
 
 
-  **Update System Packages:**
+ ####   **Update System Packages:**
     ```bash
     sudo apt update && sudo apt upgrade -y
     ```
 
-  **Install Git, Docker, and Docker Compose:**
+ ####   **Install Git, Docker, and Docker Compose:**
     ```bash
     sudo apt install git docker.io docker-compose-v2 -y
     ```
 
-  **Start and Enable Docker:**
+ ####  **Start and Enable Docker:**
     ```bash
     sudo systemctl start docker
     sudo systemctl enable docker
     ```
 
-  **Add User to Docker Group (to run docker without sudo):**
+ ####  **Add User to Docker Group (to run docker without sudo):**
     ```bash
     sudo usermod -aG docker $USER
     newgrp docker
     ```
 
 
-  **Clone the repository to EC2** 
+ ####  **Clone the repository to EC2** 
 
     ```bash
     mkdir -p ~/Two-Tier-Flask-App-Project
