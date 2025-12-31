@@ -161,7 +161,7 @@ This document outlines the step-by-step process for deploying a two-tier web app
 
     ```
 
-
+---
 
 ### **4. Step 2: GitHub Repository Configuration**
 
@@ -300,17 +300,15 @@ jobs:
             curl -f http://localhost:5000/health || curl -f http://localhost:5000/
 
 ```
-
+---
 
 
 ### **5. Step 3: Install Dependencies on EC2**
-## ** Connect to EC2 Instance**
+ **Connect to EC2 Instance**
     * Use SSH to connect to the instance's public IP address.
     ```bash
     ssh -i /path/to/key.pem ubuntu@<ec2-public-ip>
     ```
-
----
 
 
   **Update System Packages:**
@@ -335,7 +333,6 @@ jobs:
     newgrp docker
     ```
 
----
 
   **Clone the repository to EC2** 
 
@@ -351,10 +348,14 @@ jobs:
 ### **6. Conclusion**
 The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the GitHub actions workflow, which will SSH into EC2, build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
 
+---
 
 ### **7. Infrastructure Diagram**
 <img src="diagrams/infra.png">
 
+---
 
 ### **8. Work flow Diagram**
 <img src="diagrams/workflow.PNG">
+
+---
