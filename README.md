@@ -348,8 +348,8 @@ Use SSH to connect to the instance's public IP address.
 ### **6. Conclusion**
 The CI/CD pipeline is now fully operational. Any `git push` to the `main` branch of the configured GitHub repository will automatically trigger the GitHub actions workflow, which will SSH into EC2, build the new Docker image and deploy the updated application, ensuring a seamless and automated workflow from development to production.
 
-**Verify Deployment:
-After a successful build, your Flask application will be accessible at http://<your-ec2-public-ip>:5000.**
+**Verify Deployment:**
+After a successful build, your Flask application will be accessible at http://<your-ec2-public-ip>:5000.
 ---
 
 ### **7. Infrastructure Diagram**
